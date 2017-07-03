@@ -11,19 +11,17 @@ public class BasicMovement : MonoBehaviour {
     public float moveSpeed = 6f;
     public float moveSide = 0.86f;
     public float moveBack = 0.7f;
-    public float jumpControlPenalty = 0.05f; // movement speed penalty while in air.
+    public float jumpControlPenalty = 0.075f; // movement speed penalty while in air.
     public float jumpForce = 12f;
     public float jumpDelay = 0.3f; // Delay between being able to jump
-    public float gravityModifier = 0.5f;
+    public float gravityModifier = 0.4f;
+    public float slopeForce = 0.5f;
 
-    // normalForce: prevents users from sticking to walls by adding force away from
-    public float normalForce = 0.025f;
 
     // baseGravStr applied when on ground
     private const float gravityBaseStr = -0.1f;
-    private const float groundCheckLength = 0.5f;
     private CharacterController controller;
-    private Vector3 movementVec, slopeWallForce;
+    private Vector3 finalMovement, groundNormal;
     private Vector3 gravityAccum, gravityBase;
     private bool canJump;
 
@@ -31,13 +29,10 @@ public class BasicMovement : MonoBehaviour {
     private float hori, vert;
     private bool jumpKey;
 
-    private Ray groundRay;
-
     void Awake()
     {
-        movementVec = Vector3.zero;
+        finalMovement = Vector3.zero;
         canJump = true;
-        groundRay = new Ray(transform.position, Vector3.down); // origin is wrong
         gravityBase = new Vector3(0, gravityBaseStr, 0);
     }
 
@@ -57,83 +52,81 @@ public class BasicMovement : MonoBehaviour {
     void FixedUpdate()
     {
         bool grounded = controller.isGrounded;
+        Vector3 input = createInputVector(hori, vert);
+        float groundAngle = calcSlopeAngle(groundNormal);
 
-        Vector3 inputVec = createInputVector(hori, vert);
+        inputStateModification(ref input, grounded, groundAngle);
 
+        inputToMovement(ref input, ref finalMovement, grounded);
+
+        //trySlopeForce(ref finalMovement, grounded, groundAngle);
+
+        tryJump(ref finalMovement, grounded, groundAngle);
+
+        applyGravity(ref finalMovement, grounded);
+
+        Vector3 debugVec = Vector3.ClampMagnitude(finalMovement, 1f);
+        DebugUtilities.debugVector(transform.position + new Vector3(0, -1, 0), debugVec);
+        controller.Move(finalMovement * Time.deltaTime);
+    }
+
+    /**
+     * Apply jumping to movement
+     */
+    private void tryJump(ref Vector3 movement, bool grounded, float groundAngle) {
+        if (grounded && jumpKey && canJump) {
+            finalMovement += Vector3.up * jumpForce;
+            StartCoroutine(startJumpDelay());
+        }
+    }
+
+    /**
+     * Creates the movement vec from the input vec.
+     */
+    private void inputToMovement(ref Vector3 input, ref Vector3 movement, bool grounded) {
         if (grounded) {
-            RaycastHit hitInfo;
-            if (groundCheck(out hitInfo)) {
-            } else {
-                //Debug.Log("ground check while grounded failed.");
-            }
-
-            // Only project if going downhill. There are stuttering issues going uphill.
-            Vector3 groundNorm = getGroundNormal();
-            if (groundNorm != Vector3.right && inputVec != Vector3.zero && Vector3.Dot(groundNorm, inputVec) >= 0) {
-                inputVec = Vector3.ProjectOnPlane(inputVec, groundNorm);
-            }
-
-            movementVec = inputVec;
-            if (jumpKey && canJump) {
-                movementVec += Vector3.up * jumpForce;
-                StartCoroutine(startJumpDelay());
-            }
+            finalMovement = input;
         } else {
             // This may cause really fast air movements over time, we'll see.
-            inputVec *= jumpControlPenalty;
-            movementVec += inputVec;
+            finalMovement += input;
         }
-
-        applyGravity(ref movementVec, grounded);
-
-        //movementVec += slopeWallForce;
-        //slopeWallForce = Vector3.zero;
-
-        Vector3 debugVec = Vector3.ClampMagnitude(movementVec, 1f);
-        DebugUtilities.debugVector(transform.position + new Vector3(0, -1, 0), debugVec);
-        controller.Move(movementVec * Time.deltaTime);
     }
 
     /**
-     * Raycasts toward the ground from the base of the controller.
+     * Modifies the input vector after checking particular states of the controller
      */
-    private bool groundCheck(out RaycastHit hitInfo) {
-        Vector3 controllerBase = transform.position - new Vector3(0, controller.height / 2, 0);
-        groundRay.origin = controllerBase;
+    private void inputStateModification(ref Vector3 input, bool grounded, float groundAngle) {
+        if (grounded) {
+            if (groundAngle > controller.slopeLimit) {
+                // Disable input toward slope
+                /*
+                Vector3 dirToSlope = -groundNormal;
+                dirToSlope.y = 0;
 
-        RaycastHit hit;
-        if (Physics.Raycast(groundRay, out hit, groundCheckLength)) {
-            hitInfo = hit;
-            return true;
+                Vector3 inputTowardSlope = Vector3.Project(input, dirToSlope);
+                input -= inputTowardSlope;
+                */
+            } else {
+                // Only plane project downhill. if input == 0 then dot == 0.
+                bool goingDownhill = Vector3.Dot(input, groundNormal) > 0;
+                if (goingDownhill) {
+                    input = Vector3.ProjectOnPlane(input, groundNormal);
+                }
+            }
+        } else {
+            input *= jumpControlPenalty;
         }
-
-        return false;
     }
 
     /**
-     * Ray casts below the controller returning the hit normal or Vector3.right
+     * Apply a force down a slope which is beyond the slope limit
      */
-    private Vector3 getGroundNormal() {
-        Vector3 controllerBase = transform.position - new Vector3(0, controller.height / 2, 0);
-        groundRay.origin = controllerBase;
+    private void trySlopeForce(ref Vector3 movement, bool grounded, float groundAngle) {
+        if (grounded && groundAngle > controller.slopeLimit) {
+            // Adds a force that will cause the controller to slide down slopes
+            Vector3 downSlope = Vector3.ProjectOnPlane(Vector3.down, groundNormal);
 
-        RaycastHit hit;
-        if (Physics.Raycast(groundRay, out hit, groundCheckLength)) {
-            return hit.normal;
-        }
-        return Vector3.right;
-    }
-
-    /**
-     * Given the ground point, moves controller toward it.
-     */
-    private void snapToGround(Vector3 point) {
-        // Don't snap if:
-        // 1. We've recently jumped.
-        if (canJump) {
-            Vector3 controllerBase = transform.position - new Vector3(0, controller.height / 2, 0);
-            Vector3 delta = point - controllerBase;
-            controller.Move(delta);
+            movement += downSlope * slopeForce;
         }
     }
 
@@ -145,16 +138,12 @@ public class BasicMovement : MonoBehaviour {
     void OnControllerColliderHit(ControllerColliderHit hit)
     {
         // Causes movements that hit a ceiling to stop early.
-        if ((controller.collisionFlags & CollisionFlags.Above) != 0 && movementVec.y > 0) {
-            movementVec.y = 0;
+        if ((controller.collisionFlags & CollisionFlags.Above) != 0 && finalMovement.y > 0) {
+            finalMovement.y = 0;
         }
 
         if ((controller.collisionFlags & CollisionFlags.Below) != 0) {
-            float slopeAngle = calcSlopeAngle(hit.normal);
-            if (slopeAngle > controller.slopeLimit) {
-                // Remove movementVec towards the wall
-                slopeWallForce = hit.normal * normalForce;
-            }
+            groundNormal = hit.normal;
         }
     }
 
@@ -194,8 +183,7 @@ public class BasicMovement : MonoBehaviour {
     }
 
     /**
-     * Coroutine implements jumping and delay between jumps.
-     * Modifies class variable movementVec
+     * Coroutine falsifies a canJump for jumpDelay seconds.
      */
     private IEnumerator startJumpDelay()
     {
@@ -205,9 +193,9 @@ public class BasicMovement : MonoBehaviour {
     }
 
     /**
-     * Adds gravity to movementVec, modifiying accumGravity if needed.
+     * Adds gravity to supplied vector, modifiying accumGravity if needed.
      */
-    private void applyGravity(ref Vector3 vec, bool grounded) {
+    private void applyGravity(ref Vector3 movement, bool grounded) {
         if (grounded) {
             // Applying 0 downward force on the controller prevents the grounded flag from flipping
             gravityAccum = gravityBase;
@@ -216,6 +204,6 @@ public class BasicMovement : MonoBehaviour {
             gravityAccum += gravityModifier * Physics.gravity * Time.deltaTime;
         }
 
-        vec += gravityAccum;
+        movement += gravityAccum;
     }
 }
