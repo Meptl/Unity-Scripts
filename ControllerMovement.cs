@@ -7,7 +7,7 @@ using UnityEngine;
 using System.Collections;
 
 [RequireComponent (typeof (CharacterController))]
-public class BasicMovement : MonoBehaviour {
+public class ControllerMovement : MonoBehaviour {
     public float moveSpeed = 6f;
     public float moveSide = 0.86f;
     public float moveBack = 0.7f;
