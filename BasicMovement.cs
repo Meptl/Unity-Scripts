@@ -15,7 +15,7 @@ public class BasicMovement : MonoBehaviour {
     public float jumpForce = 12f;
     public float jumpDelay = 0.3f; // Delay between being able to jump
     public float gravityModifier = 0.4f;
-    public float slopeForce = 0.5f;
+    public float slopeForce = 5f;
 
 
     // baseGravStr applied when on ground
@@ -59,7 +59,7 @@ public class BasicMovement : MonoBehaviour {
 
         inputToMovement(ref input, ref finalMovement, grounded);
 
-        //trySlopeForce(ref finalMovement, grounded, groundAngle);
+        trySlopeForce(ref finalMovement, grounded, groundAngle);
 
         tryJump(ref finalMovement, grounded, groundAngle);
 
@@ -71,10 +71,28 @@ public class BasicMovement : MonoBehaviour {
     }
 
     /**
+     * When controller is standing on a slope larger than the slopeLimit
+     * apply a normal force. Side collisions are checked since walls give a
+     * slopeAngle larger than the slope limit (90). Ignore ceiling collisions.
+     */
+    void OnControllerColliderHit(ControllerColliderHit hit)
+    {
+        // Causes movements that hit a ceiling to stop early.
+        if ((controller.collisionFlags & CollisionFlags.Above) != 0 && finalMovement.y > 0) {
+            finalMovement.y = 0;
+        }
+
+        if ((controller.collisionFlags & CollisionFlags.Below) != 0) {
+            groundNormal = hit.normal;
+        }
+    }
+
+
+    /**
      * Apply jumping to movement
      */
     private void tryJump(ref Vector3 movement, bool grounded, float groundAngle) {
-        if (grounded && jumpKey && canJump) {
+        if (grounded && groundAngle < controller.slopeLimit && jumpKey && canJump) {
             finalMovement += Vector3.up * jumpForce;
             StartCoroutine(startJumpDelay());
         }
@@ -99,13 +117,14 @@ public class BasicMovement : MonoBehaviour {
         if (grounded) {
             if (groundAngle > controller.slopeLimit) {
                 // Disable input toward slope
-                /*
                 Vector3 dirToSlope = -groundNormal;
                 dirToSlope.y = 0;
+                Vector3.Normalize(dirToSlope);
 
-                Vector3 inputTowardSlope = Vector3.Project(input, dirToSlope);
-                input -= inputTowardSlope;
-                */
+                float dot = Vector3.Dot(dirToSlope, input);
+                if (dot > 0) {
+                    input -= dirToSlope * dot;
+                }
             } else {
                 // Only plane project downhill. if input == 0 then dot == 0.
                 bool goingDownhill = Vector3.Dot(input, groundNormal) > 0;
@@ -127,23 +146,6 @@ public class BasicMovement : MonoBehaviour {
             Vector3 downSlope = Vector3.ProjectOnPlane(Vector3.down, groundNormal);
 
             movement += downSlope * slopeForce;
-        }
-    }
-
-    /**
-     * When controller is standing on a slope larger than the slopeLimit
-     * apply a normal force. Side collisions are checked since walls give a
-     * slopeAngle larger than the slope limit (90). Ignore ceiling collisions.
-     */
-    void OnControllerColliderHit(ControllerColliderHit hit)
-    {
-        // Causes movements that hit a ceiling to stop early.
-        if ((controller.collisionFlags & CollisionFlags.Above) != 0 && finalMovement.y > 0) {
-            finalMovement.y = 0;
-        }
-
-        if ((controller.collisionFlags & CollisionFlags.Below) != 0) {
-            groundNormal = hit.normal;
         }
     }
 
