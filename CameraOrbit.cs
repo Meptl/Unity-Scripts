@@ -12,7 +12,7 @@ public class CameraOrbit : MonoBehaviour {
     public float minZoom = 1f;
     public float maxZoom = 5f;
     public float offsetWall = 0.5f; // Distance to stay away from a wall
-	public Transform target;
+    public Transform target;
 
     private float cameraSpeed = 10f;
     private float rotationX = 0.0f;
@@ -24,7 +24,7 @@ public class CameraOrbit : MonoBehaviour {
     void Start ()
     {
         // Camera will only hit detect with layer 8
-        layerMask = 1 << 8;
+        layerMask = LayerMask.GetMask("BlocksCamera");
         Vector3 angles = transform.eulerAngles;
         rotationX = angles.y;
         rotationY = angles.x;
@@ -75,7 +75,7 @@ public class CameraOrbit : MonoBehaviour {
     */
     private static float ClampAngle(float angle, float min, float max)
     {
-        while(angle < -360f || angle > 360f){
+        while (angle < -360f || angle > 360f) {
             if (angle < -360f)
                 angle += 360f;
             if (angle > 360f)
