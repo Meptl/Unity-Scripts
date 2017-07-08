@@ -36,7 +36,10 @@ public class HitBoxManager : MonoBehaviour {
 
         bool otherWantsHit = other.manager.canHit(this, child, other);
         bool canHit = this.canHit(this, child, other);
-        Debug.Log("hurtbox hit by " + other.ToString());
+
+        if (this.health != null && otherWantsHit && canHit) {
+            this.health.hurt(other.damage);
+        }
     }
 
     /**

@@ -9,6 +9,7 @@ using UnityEngine;
 
 public class HitBox : MonoBehaviour {
     public HitBoxManager manager;
+    public float damage = 0f;
 
     private int otherLayer;
     private bool isHit;
