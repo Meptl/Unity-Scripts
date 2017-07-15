@@ -47,9 +47,10 @@ public class ControllerMovement : NetworkBehaviour {
         if (!isLocalPlayer) return;
 
         // We use raw input to have a more responsive movement
+        // We may need to check for joysticks and use GetAxis instead.
         hori = Input.GetAxisRaw("Horizontal"); // Only evaluates to -1, 0, or 1
         vert = Input.GetAxisRaw("Vertical"); // Only evaluates to -1, 0, or 1
-        jumpKey = Input.GetButton("Jump");
+        jumpKey = Input.GetButtonDown("Jump");
     }
 
     void FixedUpdate()
@@ -107,6 +108,28 @@ public class ControllerMovement : NetworkBehaviour {
             StartCoroutine(startJumpDelay());
         }
     }
+
+    /**
+     * Create the movement vector resulting from: user input, constant modification
+     * from moving forward/backward, ground state
+     */
+    private Vector3 createInputVector(float hori, float vert)
+    {
+        Vector3 movement = new Vector3(hori, 0, vert);
+
+        // Prevents diagonal movements being as fast as forward movements.
+        Vector3.Normalize(movement);
+
+        movement = transform.TransformDirection(movement);
+
+        if (hori != 0) { movement *= moveSide; }
+        if (vert < 0) { movement *= moveBack; }
+
+        movement *= moveSpeed;
+
+        return movement;
+    }
+
 
     /**
      * Modifies the input vector after checking particular states of the controller
@@ -173,27 +196,6 @@ public class ControllerMovement : NetworkBehaviour {
         slopeAngle = Mathf.Abs(slopeAngle - 90);
 
         return slopeAngle;
-    }
-
-    /**
-     * Create the movement vector resulting from: user input, constant modification
-     * from moving forward/backward, ground state
-     */
-    private Vector3 createInputVector(float hori, float vert)
-    {
-        Vector3 movement = new Vector3(hori, 0, vert);
-
-        // Prevents diagonal movements being as fast as forward movements.
-        Vector3.Normalize(movement);
-
-        movement = transform.TransformDirection(movement);
-
-        if (hori != 0) { movement *= moveSide; }
-        if (vert < 0) { movement *= moveBack; }
-
-        movement *= moveSpeed;
-
-        return movement;
     }
 
     /**
