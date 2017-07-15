@@ -11,10 +11,10 @@ public class ControllerMovement : MonoBehaviour {
     public float moveSpeed = 6f;
     public float moveSide = 0.86f;
     public float moveBack = 0.7f;
-    public float jumpControlPenalty = 0.075f; // movement speed penalty while in air.
-    public float jumpForce = 12f;
+    public float jumpControlPenalty = 0.1f; // movement speed penalty while in air.
+    public float jumpForce = 8f;
     public float jumpDelay = 0.3f; // Delay between being able to jump
-    public float gravityModifier = 0.4f;
+    public float gravityModifier = 0.3f;
     public float slopeForce = 5f;
 
 
@@ -93,20 +93,8 @@ public class ControllerMovement : MonoBehaviour {
      */
     private void tryJump(ref Vector3 movement, bool grounded, float groundAngle) {
         if (grounded && groundAngle < controller.slopeLimit && jumpKey && canJump) {
-            finalMovement += Vector3.up * jumpForce;
+            movement += Vector3.up * jumpForce;
             StartCoroutine(startJumpDelay());
-        }
-    }
-
-    /**
-     * Creates the movement vec from the input vec.
-     */
-    private void inputToMovement(ref Vector3 input, ref Vector3 movement, bool grounded) {
-        if (grounded) {
-            finalMovement = input;
-        } else {
-            // This may cause really fast air movements over time, we'll see.
-            finalMovement += input;
         }
     }
 
@@ -134,6 +122,20 @@ public class ControllerMovement : MonoBehaviour {
             }
         } else {
             input *= jumpControlPenalty;
+        }
+    }
+
+    /**
+     * Creates the movement vec from the input vec.
+     */
+    private void inputToMovement(ref Vector3 input, ref Vector3 movement, bool grounded) {
+        if (grounded) {
+            movement = input;
+        } else {
+            Vector3 result = movement + input;
+            if (result.magnitude < this.moveSpeed) {
+                movement = result;
+            }
         }
     }
 
