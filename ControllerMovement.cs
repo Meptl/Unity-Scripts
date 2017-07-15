@@ -4,10 +4,11 @@
  * Gravity is applied using this as well.
  */
 using UnityEngine;
+using UnityEngine.Networking;
 using System.Collections;
 
 [RequireComponent (typeof (CharacterController))]
-public class ControllerMovement : MonoBehaviour {
+public class ControllerMovement : NetworkBehaviour {
     public float moveSpeed = 6f;
     public float moveSide = 0.86f;
     public float moveBack = 0.7f;
@@ -43,6 +44,8 @@ public class ControllerMovement : MonoBehaviour {
 
     void Update()
     {
+        if (!isLocalPlayer) return;
+
         // We use raw input to have a more responsive movement
         hori = Input.GetAxisRaw("Horizontal"); // Only evaluates to -1, 0, or 1
         vert = Input.GetAxisRaw("Vertical"); // Only evaluates to -1, 0, or 1
@@ -51,6 +54,8 @@ public class ControllerMovement : MonoBehaviour {
 
     void FixedUpdate()
     {
+        if (!isLocalPlayer) return;
+
         bool grounded = controller.isGrounded;
         Vector3 input = createInputVector(hori, vert);
         float groundAngle = calcSlopeAngle(groundNormal);
@@ -68,6 +73,11 @@ public class ControllerMovement : MonoBehaviour {
         Vector3 debugVec = Vector3.ClampMagnitude(finalMovement, 1f);
         DebugUtilities.debugVector(transform.position + new Vector3(0, -1, 0), debugVec);
         controller.Move(finalMovement * Time.deltaTime);
+    }
+
+    public override void OnStartLocalPlayer()
+    {
+        // Modifications!
     }
 
     /**
