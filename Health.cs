@@ -2,21 +2,35 @@
  * Health System
  */
 using UnityEngine;
-using System.Collections;
+using UnityEngine.Networking;
 
-public class Health : MonoBehaviour {
-    // Should we clamp this?
-    public float health = 0f;
+public class Health : NetworkBehaviour {
+    // Currently this is static
+    public const float maxHealth = 100f;
 
-    public void hurt(float dmg) {
-        health -= dmg;
-    }
+    [SyncVar]
+    public float health = maxHealth;
 
+    /**
+     * To hurt apply negative values.
+     */
     public void heal(float dmg) {
+        if (!isServer) return;
+
         health += dmg;
+
+        if (health <= 0) {
+            RpcDie();
+        }
+        if (health > maxHealth) {
+            health = maxHealth;
+        }
     }
 
-    public bool isDead() {
-        return health < 0;
+    [ClientRpc]
+    void RpcDie() {
+        if (isLocalPlayer) {
+            Destroy(gameObject);
+        }
     }
 }

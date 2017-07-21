@@ -38,7 +38,7 @@ public class HitBoxManager : MonoBehaviour {
         bool canHit = this.canHit(this, child, other);
 
         if (this.health != null && otherWantsHit && canHit) {
-            this.health.hurt(other.damage);
+            this.health.heal(-other.damage);
         }
     }
 
